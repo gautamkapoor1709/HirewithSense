@@ -47,7 +47,11 @@ consent tabs plus the decision panel; organization settings; integration status.
 
 `features/interview/InterviewRoomPage.tsx` is the most involved screen. It fetches the room state,
 reuses an unanswered question if one exists, otherwise opens the question stream and renders tokens
-as they arrive. Answers can be typed or dictated. When the API reports server-side audio
+as they arrive. The room is voice-first: on the first question it asks the candidate to begin the
+voice session (browsers only play audio and open the microphone after a click), then reads every
+question aloud and starts listening as soon as it has finished speaking. The spoken answer appears
+in the composer as text so it can be corrected before it is sent; the preference is remembered per
+browser and "I prefer to type" switches to the keyboard at any time. When the API reports server-side audio
 (`AI_ENABLE_AUDIO=true`), dictation records the microphone with `MediaRecorder` and sends the clip
 to `/ai/transcribe` when the candidate stops, which works in every modern browser; questions are
 read aloud through `/ai/speak`. Without server audio the room uses the browser's own

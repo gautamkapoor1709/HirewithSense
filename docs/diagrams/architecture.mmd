@@ -1,0 +1,47 @@
+flowchart LR
+  subgraph Client["Browser"]
+    WEB["React SPA\n(Vite, Tailwind, Monaco)"]
+    SPEECH["Web Speech API\n(fallback STT / TTS)"]
+  end
+
+  subgraph Edge["Web container"]
+    NGINX["nginx\nstatic files + /api proxy"]
+  end
+
+  subgraph API["API container (Fastify)"]
+    ROUTES["HTTP routes\n/api/v1/*  ·  /docs  ·  /health  ·  /metrics"]
+    AUTH["Auth\nJWT access + rotating refresh"]
+    DOMAIN["Domain modules\norgs · jobs · invites · interviews · coding · reports"]
+    AI["AI provider adapter\nOpenAI-compatible | offline"]
+    RUNNER["Code runner adapter\nDocker | Judge0 | local"]
+    JOBS["pg-boss workers\nresume.parse · submission.grade · report.generate\nemail.send · interview.expire · retention.purge"]
+  end
+
+  subgraph Data["Data"]
+    PG[("PostgreSQL\napplication schema + pgboss schema")]
+    FILES[("Resume storage\nlocal volume | S3")]
+  end
+
+  subgraph External["External services"]
+    LLM["Model endpoint\nOpenAI · Gemini · Qwen · Groq · Ollama"]
+    SANDBOX["Docker daemon\n(ephemeral sandbox containers)"]
+    JUDGE0["Judge0 CE\n(hosted alternative)"]
+    SMTP["SMTP relay"]
+  end
+
+  WEB -- "HTTPS, JSON + SSE" --> NGINX
+  WEB -. optional .- SPEECH
+  NGINX -- "/api, /docs" --> ROUTES
+  ROUTES --> AUTH --> DOMAIN
+  DOMAIN --> AI
+  DOMAIN --> RUNNER
+  DOMAIN -- enqueue --> JOBS
+  JOBS --> AI
+  JOBS --> RUNNER
+  DOMAIN --> PG
+  JOBS --> PG
+  DOMAIN --> FILES
+  AI -- "chat completions, audio" --> LLM
+  RUNNER --> SANDBOX
+  RUNNER --> JUDGE0
+  JOBS -- "invitations, resets, notifications" --> SMTP

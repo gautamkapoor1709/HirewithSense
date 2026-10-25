@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Bot, CheckCircle2, Mic, MicOff, SkipForward, Volume2, VolumeX, Send, MessageSquareText } from 'lucide-react';
+import { Bot, CheckCircle2, Headphones, Keyboard, Mic, MicOff, SkipForward, Volume2, VolumeX, Send, MessageSquareText } from 'lucide-react';
 import type { AiStatusDto, CandidateTurnDto, InterviewDto, InterviewRoomState, QuestionStreamEvent } from '@hws/shared';
 import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, PageLoader, Progress, Switch, Tooltip } from '@/components/ui';
 import { get, isApiError, post, streamSse } from '@/lib/api';
@@ -51,7 +51,29 @@ export default function InterviewRoomPage() {
   const [submitting, setSubmitting] = useState(false);
   const [ending, setEnding] = useState(false);
   const [confirmSkip, setConfirmSkip] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(false);
+  // Voice-first by default: questions are spoken and answers are transcribed. The preference is
+  // remembered per browser; text mode is always one click away.
+  const [voiceMode, setVoiceModeState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('hws-voice-mode');
+      if (saved === 'off') return false;
+    } catch {
+      /* ignore */
+    }
+    return speechSynthesisSupported();
+  });
+  const setVoiceMode = useCallback((v: boolean) => {
+    setVoiceModeState(v);
+    try {
+      localStorage.setItem('hws-voice-mode', v ? 'on' : 'off');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  // Browsers only play audio and open the microphone after a user gesture, so the voice session
+  // starts from an explicit "Begin" click.
+  const [voiceReady, setVoiceReady] = useState(false);
+  const startListeningRef = useRef<() => void>(() => {});
   const [listening, setListening] = useState(false);
   const shownAt = useRef<number>(Date.now());
   const requesting = useRef(false);
@@ -169,11 +191,15 @@ export default function InterviewRoomPage() {
   // Speak new questions in voice mode.
   const lastSpoken = useRef<string | null>(null);
   useEffect(() => {
-    if (!voiceMode || !openTurn || lastSpoken.current === openTurn.id) return;
+    if (!voiceMode || !voiceReady || !openTurn || lastSpoken.current === openTurn.id) return;
     lastSpoken.current = openTurn.id;
     setState('speaking');
-    say(openTurn.question, () => setState(listening ? 'listening' : 'idle'));
-  }, [voiceMode, openTurn, listening, say]);
+    say(openTurn.question, () => {
+      setState('idle');
+      // Hand the floor to the candidate as soon as the question has been read.
+      startListeningRef.current();
+    });
+  }, [voiceMode, voiceReady, openTurn, say]);
 
   useEffect(() => () => {
     stopAllSpeech();
@@ -257,6 +283,7 @@ export default function InterviewRoomPage() {
     setState('listening');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answer, serverStt]);
+  startListeningRef.current = startListening;
 
   const submit = useCallback(async () => {
     if (!openTurn || !answer.trim() || submitting) return;
@@ -361,10 +388,16 @@ export default function InterviewRoomPage() {
                   if (!v) {
                     stopAllSpeech();
                     if (listening) stopListening();
-                  } else if (openTurn) {
-                    lastSpoken.current = openTurn.id;
-                    setState('speaking');
-                    say(openTurn.question, () => setState('idle'));
+                  } else {
+                    setVoiceReady(true);
+                    if (openTurn) {
+                      lastSpoken.current = openTurn.id;
+                      setState('speaking');
+                      say(openTurn.question, () => {
+                        setState('idle');
+                        startListeningRef.current();
+                      });
+                    }
                   }
                 }}
                 aria-label="Voice mode"
@@ -401,6 +434,27 @@ export default function InterviewRoomPage() {
               <Button size="lg" loading={ending} onClick={() => void completeSection()}>
                 {isLastSection ? 'Finish interview' : 'Continue to next section'}
               </Button>
+            </div>
+          ) : voiceMode && !voiceReady ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+              <div className="flex size-14 items-center justify-center rounded-full bg-accent/10 text-accent">
+                <Headphones className="size-7" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Voice interview</h2>
+                <p className="mt-1 max-w-sm text-sm text-muted">
+                  The interviewer will read each question aloud and listen to your answer. Your words appear as text so you can check them before sending. Use a quiet place and allow the microphone when asked.
+                </p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button size="lg" onClick={() => setVoiceReady(true)} disabled={!openTurn && !streaming}>
+                  <Mic /> Begin voice interview
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => setVoiceMode(false)}>
+                  <Keyboard /> I prefer to type
+                </Button>
+              </div>
+              {!serverStt && !speechRecognitionSupported() ? <p className="text-xs text-warning">Dictation needs Chrome or Edge in this setup; questions will still be read aloud.</p> : null}
             </div>
           ) : (
             <>

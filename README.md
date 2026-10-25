@@ -45,9 +45,10 @@ exported for bias audits, and data is purged on a per-organization retention sch
 - Accept an invitation, create an account in a minute, upload a resume (PDF, DOCX or TXT) that is
   parsed into a structured profile.
 - A lobby with a device check and the AI-disclosure notice; an accommodation request field.
-- An interview room that streams the interviewer's questions, supports dictation and read-aloud
-  (server-side when audio models are configured, in the browser otherwise), keeps a live transcript,
-  and shows a clear timer.
+- A voice-first interview room: the interviewer reads each question aloud and listens for the
+  answer, which is transcribed to text for the candidate to check before sending (server-side
+  speech when audio models are configured, the browser's own engines otherwise). Typing is always
+  one click away. A live transcript and a clear timer sit alongside.
 - A coding room with Monaco, several languages, run-samples with custom input, and asynchronous
   grading with locked hidden cases.
 - Control over their data: sessions, password, a one-click export of everything held about them, and account deletion.
@@ -133,14 +134,20 @@ TEST_CODE_RUNNER=docker pnpm --filter @hws/api test   # also exercise the sandbo
 
 ## Demo accounts
 
-The seed creates an organization called Northwind Labs with one open job (conversation plus a
-two-problem coding round), a draft job, and a candidate whose interview is ready to start. The
-password for both accounts is `DemoPassword123!`.
+The seed creates two organizations, each with an open job (a conversation section plus a
+two-problem coding round), a recruiter who owns the organization, and a candidate whose interview
+is ready to start. The password for every demo account is `DemoPassword123!`.
 
-| Role | Email | Lands on |
-| --- | --- | --- |
-| Recruiter (owner) | `recruiter@demo.hirewithsense.local` | `/recruiter` |
-| Candidate | `candidate@demo.hirewithsense.local` | `/app` |
+| Organization | Role | Email | Lands on |
+| --- | --- | --- | --- |
+| Northwind Labs | Recruiter (owner) | `recruiter@demo.hirewithsense.local` | `/recruiter` |
+| Northwind Labs | Candidate | `candidate@demo.hirewithsense.local` | `/app` |
+| Sukhoi-dev | Recruiter (owner) | `recruiter@sukhoi-dev.hirewithsense.local` | `/recruiter` |
+| Sukhoi-dev | Candidate | `candidate@sukhoi-dev.hirewithsense.local` | `/app` |
+
+Northwind Labs is hiring a Backend Engineer (Node.js); Sukhoi-dev is hiring a Software Engineer.
+The seed is idempotent per organization, so re-running it after adding a new demo organization
+only creates what is missing.
 
 ## Configuration
 
@@ -172,6 +179,7 @@ scaling notes and the runner trade-offs are in [docs/DEPLOYMENT.md](docs/DEPLOYM
 | --- | --- |
 | [Getting started](docs/GETTING_STARTED.md) | You want a local instance running |
 | [Architecture](docs/ARCHITECTURE.md) | You want to understand the system before changing it |
+| [Diagrams](docs/DIAGRAMS.md) | You want the architecture, ER, database and use-case diagrams |
 | [Development guide](docs/DEVELOPMENT.md) | You are about to write code |
 | [API reference](docs/API.md) | You are integrating with or extending the API |
 | [AI and scoring](docs/AI_AND_SCORING.md) | You want to know how reports are produced and how to use a real model |

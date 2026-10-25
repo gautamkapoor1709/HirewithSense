@@ -98,8 +98,10 @@ This starts the API on http://localhost:4000 (interactive OpenAPI docs at `/docs
 on http://localhost:5173. The web dev server proxies `/api` to the API, so there is nothing to
 configure for CORS during development.
 
-Sign in as the recruiter to see the configured job, or as the candidate to run the interview that
-is waiting for them. To try the invitation flow end to end, invite any email address from the job's
+Sign in as a recruiter to see the configured job, or as a candidate to run the interview that is
+waiting for them. There are two demo organizations (Northwind Labs and Sukhoi-dev), each with a
+recruiter and a candidate; the README lists the accounts. For the voice interview use Chrome or
+Edge, which have built-in speech recognition, or enable server-side audio. To try the invitation flow end to end, invite any email address from the job's
 **Candidates** tab, then open **Dev mailbox** in the sidebar and click the link in the stored email.
 
 ## 8. Run the tests

@@ -2,7 +2,8 @@
 
 > Status: implemented (v2, October 2026). This document is the reference for the system design;
 > the other documents in this folder cover setup, development, the API, deployment, AI and
-> scoring, code execution, the frontend and compliance.
+> scoring, code execution, the frontend and compliance. Architecture, entity-relationship,
+> database and use-case diagrams are in [DIAGRAMS.md](DIAGRAMS.md).
 
 ## 1. Product vision
 

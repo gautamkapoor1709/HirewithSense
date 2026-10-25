@@ -1,0 +1,51 @@
+flowchart LR
+  classDef actor fill:#f1f5f9,stroke:#334155,color:#0f172a
+  classDef system fill:#ecfdf5,stroke:#0f766e,color:#0f172a
+  classDef uc fill:#ffffff,stroke:#64748b,color:#0f172a
+
+  CAND(["Candidate"]):::actor
+  REC(["Recruiter / Org admin"]):::actor
+  OWN(["Org owner"]):::actor
+  AI(["AI interviewer\n(model)"]):::system
+  SB(["Code sandbox"]):::system
+  SCHED(["Scheduler\n(pg-boss)"]):::system
+
+  subgraph Candidate_journey["Candidate journey"]
+    U1(["Accept invitation /\ncreate account"]):::uc
+    U2(["Upload and parse resume"]):::uc
+    U3(["Review AI disclosure\nand give consent"]):::uc
+    U4(["Answer questions\n(voice or text)"]):::uc
+    U5(["Solve coding problems\nin the IDE"]):::uc
+    U6(["Finish interview"]):::uc
+    U7(["Export or delete\nown data"]):::uc
+  end
+
+  subgraph Recruiter_workspace["Recruiter workspace"]
+    R1(["Define job, rubric\nand interview plan"]):::uc
+    R2(["Manage question bank\nand coding problems"]):::uc
+    R3(["Invite candidates"]):::uc
+    R4(["Review report, Q&A,\ncode and integrity"]):::uc
+    R5(["Record hiring decision"]):::uc
+    R6(["Rank candidates and\nexport CSV"]):::uc
+    R7(["Manage members\nand invitations"]):::uc
+    R8(["Set retention and\norganization profile"]):::uc
+  end
+
+  subgraph Automated["Automated"]
+    S1(["Generate questions\nand evaluate answers"]):::uc
+    S2(["Grade submissions"]):::uc
+    S3(["Produce evidence-\nanchored report"]):::uc
+    S4(["Expire overdue interviews;\npurge past retention"]):::uc
+  end
+
+  CAND --> U1 & U2 & U3 & U4 & U5 & U6 & U7
+  REC --> R1 & R2 & R3 & R4 & R5 & R6
+  OWN --> R7 & R8
+  OWN -. "also everything a recruiter does" .-> REC
+  U4 --- S1
+  U5 --- S2
+  U6 --- S3
+  AI --> S1 & S3
+  SB --> S2
+  SCHED --> S4
+  R4 -. "reads" .- S3

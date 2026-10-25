@@ -1,0 +1,270 @@
+erDiagram
+  users {
+    uuid id PK
+    text name
+    text username UK
+    text email UK
+    text password_hash
+    user_role role "candidate | recruiter | superadmin"
+    timestamptz email_verified_at
+    int failed_login_attempts
+    timestamptz locked_until
+    int token_version
+    timestamptz deleted_at
+  }
+  organizations {
+    uuid id PK
+    text name
+    text slug UK
+    text website
+    int retention_days
+  }
+  memberships {
+    uuid id PK
+    uuid organization_id FK
+    uuid user_id FK
+    org_role role "owner | admin | member"
+  }
+  org_invites {
+    uuid id PK
+    uuid organization_id FK
+    text email
+    org_role role
+    text token_hash UK
+    uuid invited_by FK
+    timestamptz expires_at
+    timestamptz accepted_at
+  }
+  refresh_sessions {
+    uuid id PK
+    uuid user_id FK
+    text token_hash UK
+    uuid family_id
+    text user_agent
+    text ip
+    timestamptz expires_at
+    timestamptz revoked_at
+    timestamptz last_used_at
+  }
+  auth_tokens {
+    uuid id PK
+    uuid user_id FK
+    auth_token_purpose purpose "password_reset | email_verify"
+    text token_hash UK
+    timestamptz expires_at
+    timestamptz used_at
+  }
+  resumes {
+    uuid id PK
+    uuid user_id FK
+    text original_name
+    text mime_type
+    int size_bytes
+    text storage_key
+    text extracted_text
+    parse_status parse_status
+    jsonb profile
+  }
+  jobs {
+    uuid id PK
+    uuid organization_id FK
+    text title
+    text slug "unique per organization"
+    text description
+    jsonb skills
+    job_status status "draft | open | closed | archived"
+    jsonb competencies "weights sum to 100"
+    jsonb interview_plan "ordered sections"
+    float minimum_score
+    text bias_audit_url
+    uuid created_by FK
+  }
+  questions {
+    uuid id PK
+    uuid job_id FK
+    text prompt
+    text competency_key
+    difficulty difficulty
+    jsonb expected_signals
+    jsonb follow_up_hints
+    int order
+  }
+  coding_problems {
+    uuid id PK
+    uuid job_id FK
+    text title
+    text statement "markdown"
+    difficulty difficulty
+    jsonb language_ids
+    jsonb starter_code "per language"
+    int time_limit_ms
+    int memory_limit_mb
+    jsonb test_cases "input, expectedOutput, isSample, weight"
+  }
+  interview_invites {
+    uuid id PK
+    uuid job_id FK
+    uuid organization_id FK
+    text email
+    text token_hash UK
+    invite_status status
+    timestamptz expires_at
+    timestamptz accepted_at
+    uuid interview_id
+    uuid invited_by FK
+  }
+  interviews {
+    uuid id PK
+    uuid job_id FK
+    uuid organization_id FK
+    uuid candidate_id FK
+    uuid invite_id FK
+    uuid resume_id FK
+    interview_status status "ready | in_progress | submitted | completed | expired | cancelled"
+    jsonb plan "snapshot of the job plan"
+    jsonb sections "per-section progress and deadlines"
+    int current_section
+    timestamptz consented_at
+    timestamptz started_at
+    timestamptz overall_deadline
+    timestamptz complete_by
+    timestamptz submitted_at
+    timestamptz completed_at
+    report_status report_status
+  }
+  consents {
+    uuid id PK
+    uuid interview_id FK
+    uuid user_id FK
+    text disclosure_version
+    text text_hash
+    text accommodation_request
+    text ip
+    text user_agent
+    timestamptz consented_at
+  }
+  interview_turns {
+    uuid id PK
+    uuid interview_id FK
+    int section_index
+    int order
+    text question
+    text competency_key
+    turn_source source "bank | generated | follow_up"
+    uuid question_id
+    text answer
+    timestamptz answered_at
+    float answer_duration_seconds
+    text input_mode
+    bool skipped
+    jsonb evaluation
+  }
+  transcript_events {
+    uuid id PK
+    uuid interview_id FK
+    int section_index
+    speaker speaker "interviewer | candidate | system"
+    text text
+    uuid turn_id
+    timestamptz at
+  }
+  code_drafts {
+    uuid id PK
+    uuid interview_id FK
+    uuid problem_id "unique with interview_id"
+    text language_id
+    text source_code
+  }
+  code_submissions {
+    uuid id PK
+    uuid interview_id FK
+    uuid problem_id
+    int section_index
+    text language_id
+    text source_code
+    text kind "run | submit"
+    submission_status status
+    int passed
+    int total
+    float score
+    jsonb results "per-case verdicts"
+    text runner
+    timestamptz graded_at
+  }
+  proctoring_events {
+    uuid id PK
+    uuid interview_id FK
+    text type
+    timestamptz at
+    int section_index
+    jsonb meta
+  }
+  reports {
+    uuid id PK
+    uuid interview_id FK "unique"
+    report_status status
+    text summary
+    jsonb strengths
+    jsonb considerations
+    jsonb competencies "score, level, confidence, evidence"
+    float weighted_score
+    float coverage
+    text recommendation
+    bool meets_minimum
+    jsonb integrity
+    text provider
+    text model
+    timestamptz generated_at
+  }
+  decisions {
+    uuid id PK
+    uuid interview_id FK "unique"
+    decision decision "advance | hold | reject | hire"
+    text reason
+    bool overrides_recommendation
+    uuid decided_by FK
+    timestamptz decided_at
+  }
+  audit_logs {
+    uuid id PK
+    uuid organization_id
+    uuid actor_id
+    text action
+    text target_type
+    text target_id
+    jsonb meta
+    text ip
+    timestamptz created_at
+  }
+  email_outbox {
+    uuid id PK
+    text to
+    text subject
+    text text
+    text html
+    text status
+    timestamptz sent_at
+  }
+
+  organizations ||--o{ memberships : ""
+  users ||--o{ memberships : ""
+  organizations ||--o{ org_invites : ""
+  users ||--o{ refresh_sessions : ""
+  users ||--o{ auth_tokens : ""
+  users ||--o{ resumes : ""
+  organizations ||--o{ jobs : ""
+  jobs ||--o{ questions : ""
+  jobs ||--o{ coding_problems : ""
+  jobs ||--o{ interview_invites : ""
+  jobs ||--o{ interviews : ""
+  users ||--o{ interviews : "candidate"
+  interview_invites |o--o| interviews : ""
+  resumes |o--o{ interviews : ""
+  interviews ||--o{ consents : ""
+  interviews ||--o{ interview_turns : ""
+  interviews ||--o{ transcript_events : ""
+  interviews ||--o{ code_drafts : ""
+  interviews ||--o{ code_submissions : ""
+  interviews ||--o{ proctoring_events : ""
+  interviews ||--o| reports : ""
+  interviews ||--o| decisions : ""
