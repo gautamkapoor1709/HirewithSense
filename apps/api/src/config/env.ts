@@ -53,11 +53,27 @@ export const EnvSchema = z.object({
   AI_API_KEY: z.string().optional(),
   AI_MODEL: z.string().default('gpt-4.1-mini'),
   AI_REASONING_MODEL: z.string().optional(),
-  AI_STT_MODEL: z.string().default('gpt-4o-mini-transcribe'),
-  AI_TTS_MODEL: z.string().default('gpt-4o-mini-tts'),
-  AI_TTS_VOICE: z.string().default('coral'),
   AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(60000),
+  /** Legacy switch: use the AI_* endpoint for speech too (OpenAI). Prefer SPEECH_* below. */
   AI_ENABLE_AUDIO: bool,
+
+  /**
+   * Speech (transcription + text-to-speech) is configured separately from the language model so a
+   * free self-hosted engine (Speaches, LocalAI) can serve voice while the LLM is OpenAI, Gemini or
+   * the offline provider. Any OpenAI-compatible /v1/audio endpoint works.
+   */
+  SPEECH_PROVIDER: z.enum(['none', 'openai_compatible']).default('none'),
+  SPEECH_BASE_URL: z.string().url().optional(),
+  SPEECH_API_KEY: z.string().optional(),
+  SPEECH_STT_MODEL: z.string().default('gpt-4o-mini-transcribe'),
+  SPEECH_TTS_MODEL: z.string().default('gpt-4o-mini-tts'),
+  SPEECH_TTS_VOICE: z.string().default('coral'),
+  SPEECH_TTS_FORMAT: z.enum(['mp3', 'wav', 'opus', 'aac', 'flac']).default('mp3'),
+  SPEECH_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(60000),
+  /** Compatibility aliases for the previous variable names. */
+  AI_STT_MODEL: z.string().optional(),
+  AI_TTS_MODEL: z.string().optional(),
+  AI_TTS_VOICE: z.string().optional(),
 
   CODE_RUNNER: z.enum(['docker', 'judge0', 'local', 'none']).default('none'),
   DOCKER_BIN: z.string().default('docker'),

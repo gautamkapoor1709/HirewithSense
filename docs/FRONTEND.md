@@ -55,8 +55,13 @@ browser and "I prefer to type" switches to the keyboard at any time. When the AP
 (`AI_ENABLE_AUDIO=true`), dictation records the microphone with `MediaRecorder` and sends the clip
 to `/ai/transcribe` when the candidate stops, which works in every modern browser; questions are
 read aloud through `/ai/speak`. Without server audio the room uses the browser's own
-`SpeechRecognition` (Chrome and Edge) and `speechSynthesis`, and degrades to text elsewhere. The
-helpers for both paths are in `features/interview/speech.ts`. The composer records how long the candidate took,
+`SpeechRecognition` and `speechSynthesis`. Those are probed rather than assumed: voices are loaded
+asynchronously and a browser with none (common on Linux) is told so instead of failing silently; a
+synthesis watchdog moves on if playback never starts; and recognition errors are translated into
+plain explanations (Brave and most Chromium builds report `network` because Google's service is
+unavailable to them). Depending on what works, the room reads aloud and listens, reads aloud and
+asks for typed answers, or falls back to text entirely, and the "Begin voice interview" step says
+which. The helpers for both paths are in `features/interview/speech.ts`. The composer records how long the candidate took,
 the proctoring hook records focus, visibility, full-screen and paste events and sends them in
 batches, and a countdown corrected for clock skew (the API returns its own time) drives the header.
 A 410 from any write means the section's time is up; the page completes the section and routes to

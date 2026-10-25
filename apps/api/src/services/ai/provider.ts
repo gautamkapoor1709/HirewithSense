@@ -24,11 +24,8 @@ export interface AiProvider {
   readonly name: string;
   readonly model: string | null;
   readonly configured: boolean;
-  readonly audio: boolean;
   completeJson<T>(opts: JsonCompletionOptions<T>): Promise<T>;
   streamText(opts: TextStreamOptions): AsyncIterable<string>;
-  transcribe(audio: Buffer, filename: string, mime: string): Promise<string>;
-  speak(text: string): Promise<{ audio: Buffer; mime: string }>;
 }
 
 let provider: AiProvider | null = null;

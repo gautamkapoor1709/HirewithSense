@@ -54,9 +54,23 @@ stops the process with a readable message rather than failing later.
 | `AI_API_KEY` | | |
 | `AI_MODEL` | `gpt-4.1-mini` | Used for questions and evaluations |
 | `AI_REASONING_MODEL` | | Optional stronger model for final reports |
-| `AI_ENABLE_AUDIO` | false | Server-side transcription and speech |
-| `AI_STT_MODEL`, `AI_TTS_MODEL`, `AI_TTS_VOICE` | | Audio model names |
 | `AI_TIMEOUT_MS` | 60000 | |
+
+### Speech (voice interviews)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `SPEECH_PROVIDER` | `none` | `openai_compatible` for OpenAI or any engine with the same audio API |
+| `SPEECH_BASE_URL` | | e.g. `http://speaches:8000/v1` for the bundled self-hosted engine |
+| `SPEECH_API_KEY` | | OpenAI key; self-hosted engines ignore it |
+| `SPEECH_STT_MODEL` | `gpt-4o-mini-transcribe` | `Systran/faster-whisper-small` with Speaches |
+| `SPEECH_TTS_MODEL` | `gpt-4o-mini-tts` | `speaches-ai/Kokoro-82M-v1.0-ONNX` with Speaches |
+| `SPEECH_TTS_VOICE` | `coral` | `af_heart` with Kokoro |
+| `SPEECH_TTS_FORMAT` | `mp3` | |
+| `AI_ENABLE_AUDIO` | false | Legacy: reuse the `AI_*` endpoint for speech |
+
+Start the bundled engine with `docker compose --profile speech up -d`, then install the models once
+with `./scripts/speech-models.sh`. It needs about 2 GB of RAM and roughly 1 GB of disk for models. See [AI_AND_SCORING.md](AI_AND_SCORING.md#speech-voice-interviews).
 
 ### Code execution
 

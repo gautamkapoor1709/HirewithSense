@@ -40,6 +40,16 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-gpt-4.1-mini}
       AI_ENABLE_AUDIO: ${AI_ENABLE_AUDIO:-false}
+      # Speech (voice interviews). 'openai_compatible' with SPEECH_BASE_URL pointing at the bundled
+      # Speaches service (profile `speech`) gives free self-hosted transcription + text-to-speech;
+      # leave SPEECH_BASE_URL empty to use OpenAI's audio models with SPEECH_API_KEY.
+      SPEECH_PROVIDER: ${SPEECH_PROVIDER:-none}
+      SPEECH_BASE_URL: ${SPEECH_BASE_URL:-}
+      SPEECH_API_KEY: ${SPEECH_API_KEY:-}
+      SPEECH_STT_MODEL: ${SPEECH_STT_MODEL:-gpt-4o-mini-transcribe}
+      SPEECH_TTS_MODEL: ${SPEECH_TTS_MODEL:-gpt-4o-mini-tts}
+      SPEECH_TTS_VOICE: ${SPEECH_TTS_VOICE:-coral}
+      SPEECH_TTS_FORMAT: ${SPEECH_TTS_FORMAT:-mp3}
       # Code execution: 'judge0' (recommended for hosted deployments) or 'docker' (requires mounting the
       # host Docker socket, see the `docker-runner` profile below).
       CODE_RUNNER: ${CODE_RUNNER:-judge0}
@@ -80,6 +90,35 @@ services:
     ports:
       - '${WEB_PORT:-8080}:80'
 
+  # Optional self-hosted speech engine (faster-whisper + Kokoro) behind the OpenAI audio API.
+  # Start with:  docker compose --profile speech up -d
+  # then install the models once:  ./scripts/speech-models.sh http://localhost:8000
+  # (or `docker compose exec api wget -qO- --post-data= http://speaches:8000/v1/models/<id>`)
+  # and set in .env:
+  #   SPEECH_PROVIDER=openai_compatible
+  #   SPEECH_BASE_URL=http://speaches:8000/v1
+  #   SPEECH_STT_MODEL=Systran/faster-whisper-small
+  #   SPEECH_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
+  #   SPEECH_TTS_VOICE=af_heart
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    profiles: ['speech']
+    restart: unless-stopped
+    ports:
+      - '${SPEECH_PORT:-8000}:8000'
+    environment:
+      ENABLE_UI: 'false'
+      WHISPER__COMPUTE_TYPE: int8
+    volumes:
+      - hf-hub-cache:/home/ubuntu/.cache/huggingface/hub
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8000/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
 volumes:
   pgdata:
   uploads:
+  hf-hub-cache:

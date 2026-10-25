@@ -11,7 +11,7 @@ import { useDocumentTitle } from '@/lib/hooks';
 import { cn, fmtDuration } from '@/lib/utils';
 import { InterviewHeader, routeAfterSection } from './InterviewHeader';
 import { ProctoringNotice, useProctoring } from './useProctoring';
-import { ServerRecorder, createRecognition, mediaRecorderSupported, speak, speakViaServer, speechRecognitionSupported, speechSynthesisSupported, stopAllSpeech, type SpeechRecognitionLike } from './speech';
+import { ServerRecorder, createRecognition, isBrave, loadVoices, mediaRecorderSupported, recognitionErrorMessage, speakAsync, speakViaServer, speechRecognitionSupported, speechSynthesisSupported, stopAllSpeech, type SpeechRecognitionLike } from './speech';
 
 type InterviewerState = 'idle' | 'thinking' | 'speaking' | 'listening';
 
@@ -34,10 +34,39 @@ export default function InterviewRoomPage() {
   const aiStatus = useQuery({ queryKey: qk.aiStatus, queryFn: () => get<AiStatusDto>('/ai/status'), staleTime: 5 * 60_000, meta: { silent: true } });
   const serverTts = Boolean(aiStatus.data?.features.speech);
   const serverStt = Boolean(aiStatus.data?.features.transcription) && mediaRecorderSupported();
-  const say = useCallback((text: string, onEnd?: () => void) => {
-    if (serverTts) void speakViaServer(text, onEnd);
-    else speak(text, onEnd);
-  }, [serverTts]);
+  // Browser capabilities are probed once: Linux browsers often ship no voices, and Brave/Chromium
+  // builds cannot use Google's recognition service. We never assume; we check and explain.
+  const [browserVoices, setBrowserVoices] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadVoices().then((v) => alive && setBrowserVoices(v.length > 0));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const browserStt = speechRecognitionSupported() && !isBrave();
+  const canSpeak = serverTts || browserVoices === true;
+  const canListen = serverStt || browserStt;
+  const voiceReason = !canSpeak && !canListen
+    ? 'This browser has no speech voices and no usable speech recognition, and the server has no speech engine configured.'
+    : !canSpeak
+      ? 'This browser has no speech voices installed, so questions cannot be read aloud here; you can still dictate answers.'
+      : !canListen
+        ? "Dictation is unavailable in this browser (it needs Google's speech service, which Brave and most Chromium builds do not provide). Questions will be read aloud; please type your answers."
+        : null;
+  const say = useCallback(
+    (text: string, onEnd?: () => void) => {
+      if (serverTts) {
+        void speakViaServer(text, onEnd);
+        return;
+      }
+      void speakAsync(text).then((r) => {
+        if (r !== 'spoken') toast.message(r === 'no-voices' ? 'No speech voices are installed in this browser; showing the question as text.' : 'Could not read the question aloud; showing it as text.');
+        onEnd?.();
+      });
+    },
+    [serverTts],
+  );
   const recorder = useRef<ServerRecorder | null>(null);
   const [transcribing, setTranscribing] = useState(false);
 
@@ -192,14 +221,19 @@ export default function InterviewRoomPage() {
   const lastSpoken = useRef<string | null>(null);
   useEffect(() => {
     if (!voiceMode || !voiceReady || !openTurn || lastSpoken.current === openTurn.id) return;
+    if (browserVoices === null && !serverTts) return; // still probing voices
     lastSpoken.current = openTurn.id;
-    setState('speaking');
-    say(openTurn.question, () => {
+    const listenNext = () => {
       setState('idle');
-      // Hand the floor to the candidate as soon as the question has been read.
-      startListeningRef.current();
-    });
-  }, [voiceMode, voiceReady, openTurn, say]);
+      if (canListen) startListeningRef.current();
+    };
+    if (!canSpeak) {
+      listenNext();
+      return;
+    }
+    setState('speaking');
+    say(openTurn.question, listenNext);
+  }, [voiceMode, voiceReady, openTurn, say, canSpeak, canListen, browserVoices, serverTts]);
 
   useEffect(() => () => {
     stopAllSpeech();
@@ -245,6 +279,10 @@ export default function InterviewRoomPage() {
         .catch(() => toast.error('Microphone access was denied.'));
       return;
     }
+    if (!browserStt) {
+      toast.error(recognitionErrorMessage(isBrave() ? 'network' : 'unsupported'), { duration: 8000 });
+      return;
+    }
     const r = createRecognition();
     if (!r) {
       toast.error('Voice input needs Chrome or Edge, or a server with transcription enabled.');
@@ -261,7 +299,9 @@ export default function InterviewRoomPage() {
       setAnswer((finalTranscript.current + interim).trimStart());
     };
     r.onerror = (e) => {
-      if (e.error === 'not-allowed') toast.error('Microphone access was denied.');
+      const msg = recognitionErrorMessage(e.error);
+      if (e.error === 'no-speech') return; // onend restarts the session
+      if (msg) toast.error(msg, { duration: 8000 });
       setListening(false);
       setState('idle');
       recognition.current = null;
@@ -282,7 +322,7 @@ export default function InterviewRoomPage() {
     setListening(true);
     setState('listening');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answer, serverStt]);
+  }, [answer, serverStt, browserStt]);
   startListeningRef.current = startListening;
 
   const submit = useCallback(async () => {
@@ -390,12 +430,12 @@ export default function InterviewRoomPage() {
                     if (listening) stopListening();
                   } else {
                     setVoiceReady(true);
-                    if (openTurn) {
+                    if (openTurn && canSpeak) {
                       lastSpoken.current = openTurn.id;
                       setState('speaking');
                       say(openTurn.question, () => {
                         setState('idle');
-                        startListeningRef.current();
+                        if (canListen) startListeningRef.current();
                       });
                     }
                   }
@@ -405,11 +445,11 @@ export default function InterviewRoomPage() {
               Voice mode
             </label>
             {openTurn ? (
-              <Tooltip content={speechSynthesisSupported() ? 'Read the question aloud' : 'Speech is not supported in this browser'}>
+              <Tooltip content={canSpeak ? 'Read the question aloud' : 'No speech voice is available (install a system voice or enable server-side speech)'}>
                 <Button
                   variant="ghost"
                   size="sm"
-                  disabled={!speechSynthesisSupported()}
+                  disabled={!canSpeak}
                   onClick={() => {
                     setState('speaking');
                     say(openTurn.question, () => setState(listening ? 'listening' : 'idle'));
@@ -447,14 +487,15 @@ export default function InterviewRoomPage() {
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
-                <Button size="lg" onClick={() => setVoiceReady(true)} disabled={!openTurn && !streaming}>
+                <Button size="lg" onClick={() => setVoiceReady(true)} disabled={(!openTurn && !streaming) || (!canSpeak && !canListen) || (browserVoices === null && !serverTts)}>
                   <Mic /> Begin voice interview
                 </Button>
                 <Button size="lg" variant="outline" onClick={() => setVoiceMode(false)}>
                   <Keyboard /> I prefer to type
                 </Button>
               </div>
-              {!serverStt && !speechRecognitionSupported() ? <p className="text-xs text-warning">Dictation needs Chrome or Edge in this setup; questions will still be read aloud.</p> : null}
+              {voiceReason ? <p className="max-w-md text-xs text-warning">{voiceReason}</p> : null}
+              {serverTts || serverStt ? <p className="text-xs text-muted">Speech runs on the server ({aiStatus.data?.speech.provider}).</p> : null}
             </div>
           ) : (
             <>
@@ -485,10 +526,10 @@ export default function InterviewRoomPage() {
                 <Button onClick={() => void submit()} disabled={!openTurn || !answer.trim()} loading={submitting}>
                   <Send /> Submit answer
                 </Button>
-                <Tooltip content={serverStt || speechRecognitionSupported() ? (listening ? (serverStt ? 'Stop and transcribe' : 'Stop listening') : 'Dictate your answer') : 'Voice input needs Chrome or Edge'}>
+                <Tooltip content={canListen ? (listening ? (serverStt ? 'Stop and transcribe' : 'Stop listening') : 'Dictate your answer') : "Dictation is unavailable in this browser; enable server-side speech or use Chrome"}>
                   <Button
                     variant={listening ? 'danger' : 'outline'}
-                    disabled={!openTurn || !(serverStt || speechRecognitionSupported()) || submitting || transcribing}
+                    disabled={!openTurn || !canListen || submitting || transcribing}
                     loading={transcribing}
                     onClick={() => {
                       if (listening) stopListening();

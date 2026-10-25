@@ -46,8 +46,8 @@ exported for bias audits, and data is purged on a per-organization retention sch
   parsed into a structured profile.
 - A lobby with a device check and the AI-disclosure notice; an accommodation request field.
 - A voice-first interview room: the interviewer reads each question aloud and listens for the
-  answer, which is transcribed to text for the candidate to check before sending (server-side
-  speech when audio models are configured, the browser's own engines otherwise). Typing is always
+  answer, which is transcribed to text for the candidate to check before sending (a free self-hosted
+  speech engine or OpenAI on the server, with the browser's own engines as the fallback). Typing is always
   one click away. A live transcript and a clear timer sit alongside.
 - A coding room with Monaco, several languages, run-samples with custom input, and asynchronous
   grading with locked hidden cases.
@@ -159,6 +159,7 @@ Everything is configured through environment variables, validated at boot. The d
 | `AI_PROVIDER` | `mock` (offline, default) or `openai_compatible` with `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` for Gemini, DashScope, Groq, Ollama and others |
 | `CODE_RUNNER` | `docker` (sandbox containers on the API host), `judge0` (hosted), `local` (development only), `none` |
 | `EMAIL_TRANSPORT` | `outbox` (stored in the database, default), `smtp`, `console` |
+| `SPEECH_PROVIDER` | `none` (browser speech only) or `openai_compatible` with `SPEECH_BASE_URL` pointing at the bundled free engine (`docker compose --profile speech up -d`) or at OpenAI |
 
 The complete list with explanations is in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#environment-reference).
 

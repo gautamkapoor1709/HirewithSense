@@ -38,23 +38,102 @@ export const speechRecognitionSupported = () => {
 
 export const speechSynthesisSupported = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
 
-export function speak(text: string, onEnd?: () => void): void {
-  if (!speechSynthesisSupported()) return;
+let voicesPromise: Promise<SpeechSynthesisVoice[]> | null = null;
+
+/**
+ * Voices load asynchronously in Chromium; on Linux a browser may have none at all (no
+ * speech-dispatcher), in which case `speak()` would silently do nothing. Wait briefly for them.
+ */
+export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (!speechSynthesisSupported()) return Promise.resolve([]);
+  if (!voicesPromise) {
+    voicesPromise = new Promise((resolve) => {
+      const have = window.speechSynthesis.getVoices();
+      if (have.length) return resolve(have);
+      const done = () => resolve(window.speechSynthesis.getVoices());
+      window.speechSynthesis.addEventListener('voiceschanged', done, { once: true });
+      setTimeout(done, 1500);
+    });
+  }
+  return voicesPromise;
+}
+
+export type SpeakResult = 'spoken' | 'no-voices' | 'unsupported' | 'failed';
+
+/**
+ * Read text with the browser voice. Resolves when playback ends (or immediately with a reason when
+ * it cannot start), so callers can always move on. A watchdog covers browsers that accept the
+ * utterance but never play it.
+ */
+export async function speakAsync(text: string): Promise<SpeakResult> {
+  if (!speechSynthesisSupported()) return 'unsupported';
+  const voices = await loadVoices();
+  if (!voices.length) return 'no-voices';
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1;
-  u.pitch = 1;
-  const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find((v) => v.lang.startsWith('en') && /Google|Natural|Samantha|Daniel/i.test(v.name)) ?? voices.find((v) => v.lang.startsWith('en'));
-  if (preferred) u.voice = preferred;
-  if (onEnd) u.onend = onEnd;
-  u.onerror = () => onEnd?.();
-  window.speechSynthesis.speak(u);
+  return new Promise((resolve) => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1;
+    u.pitch = 1;
+    const preferred = voices.find((v) => v.lang.startsWith('en') && /Google|Natural|Samantha|Daniel/i.test(v.name)) ?? voices.find((v) => v.lang.startsWith('en')) ?? voices[0];
+    if (preferred) u.voice = preferred;
+    let started = false;
+    let settled = false;
+    const finish = (r: SpeakResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
+      resolve(r);
+    };
+    const watchdog = setTimeout(() => {
+      if (!started) {
+        window.speechSynthesis.cancel();
+        finish('failed');
+      }
+    }, 2500);
+    u.onstart = () => {
+      started = true;
+    };
+    u.onend = () => finish('spoken');
+    u.onerror = (e) => finish(e.error === 'interrupted' || e.error === 'canceled' ? 'spoken' : 'failed');
+    window.speechSynthesis.speak(u);
+    // Chromium pauses long utterances after ~15 s unless nudged.
+    const keepAlive = setInterval(() => {
+      if (settled) return clearInterval(keepAlive);
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+    }, 5000);
+  });
+}
+
+/** Legacy callback form kept for existing call sites. */
+export function speak(text: string, onEnd?: () => void): void {
+  void speakAsync(text).then(() => onEnd?.());
 }
 
 export function stopSpeaking(): void {
   if (speechSynthesisSupported()) window.speechSynthesis.cancel();
 }
+
+/** Human explanations for SpeechRecognition error codes. */
+export function recognitionErrorMessage(code: string): string {
+  switch (code) {
+    case 'network':
+      return "Your browser's speech recognition needs Google's speech service, which is unavailable here (it is disabled in Brave and most Chromium builds). Enable server-side speech or type your answer.";
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return 'Microphone access was denied. Allow the microphone for this site and try again.';
+    case 'audio-capture':
+      return 'No microphone was found.';
+    case 'language-not-supported':
+      return 'Speech recognition does not support this language in your browser.';
+    case 'aborted':
+    case 'no-speech':
+      return '';
+    default:
+      return `Speech recognition stopped (${code}).`;
+  }
+}
+
+export const isBrave = () => Boolean((navigator as unknown as { brave?: unknown }).brave);
 
 /* ------------------------- server-backed speech (optional) ------------------------- */
 

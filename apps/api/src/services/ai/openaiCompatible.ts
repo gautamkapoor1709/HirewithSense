@@ -1,4 +1,4 @@
-import OpenAI, { toFile } from 'openai';
+import OpenAI from 'openai';
 import type { AiProvider, JsonCompletionOptions, TextStreamOptions } from './provider.js';
 import { env } from '../../config/env.js';
 import { aiCalls } from '../../plugins/metrics.js';
@@ -11,7 +11,6 @@ export class OpenAiCompatibleProvider implements AiProvider {
   readonly name: string;
   readonly model: string;
   readonly configured = true;
-  readonly audio: boolean;
   private readonly client: OpenAI;
   private readonly strongModel: string;
 
@@ -20,7 +19,6 @@ export class OpenAiCompatibleProvider implements AiProvider {
     this.client = new OpenAI({ apiKey: e.AI_API_KEY, baseURL: e.AI_BASE_URL, timeout: e.AI_TIMEOUT_MS, maxRetries: 2 });
     this.model = e.AI_MODEL;
     this.strongModel = e.AI_REASONING_MODEL ?? e.AI_MODEL;
-    this.audio = e.AI_ENABLE_AUDIO;
     this.name = e.AI_BASE_URL ? `openai-compatible(${new URL(e.AI_BASE_URL).hostname})` : 'openai';
   }
 
@@ -79,22 +77,6 @@ export class OpenAiCompatibleProvider implements AiProvider {
       aiCalls.inc({ task: opts.task, provider: this.name, outcome: 'error' });
       throw err;
     }
-  }
-
-  async transcribe(audio: Buffer, filename: string, mime: string): Promise<string> {
-    const file = await toFile(audio, filename, { type: mime });
-    const res = await this.client.audio.transcriptions.create({ file, model: env().AI_STT_MODEL, response_format: 'json' });
-    return (res as { text: string }).text;
-  }
-
-  async speak(text: string): Promise<{ audio: Buffer; mime: string }> {
-    const res = await this.client.audio.speech.create({
-      model: env().AI_TTS_MODEL,
-      voice: env().AI_TTS_VOICE,
-      input: text.slice(0, 4000),
-      response_format: 'mp3',
-    });
-    return { audio: Buffer.from(await res.arrayBuffer()), mime: 'audio/mpeg' };
   }
 }
 

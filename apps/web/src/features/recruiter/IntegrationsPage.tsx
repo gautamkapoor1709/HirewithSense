@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bot, Code2, ExternalLink, Mail } from 'lucide-react';
+import { Bot, Code2, ExternalLink, Mail, Mic } from 'lucide-react';
 import type { AiStatusDto } from '@hws/shared';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, PageHeader, PageLoader } from '@/components/ui';
 import { API_BASE, get } from '@/lib/api';
@@ -39,7 +39,7 @@ export default function IntegrationsPage() {
         }
       />
       {!s ? null : (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Bot className="size-4" /> AI provider</CardTitle>
@@ -63,11 +63,33 @@ export default function IntegrationsPage() {
                 <OnOff on={s.features.evaluation} label="Answer evaluation" />
                 <OnOff on={s.features.reports} label="Reports" />
                 <OnOff on={s.features.resumeParsing} label="Resume parsing" />
-                <OnOff on={s.features.transcription} label="Server transcription" />
-                <OnOff on={s.features.speech} label="Server speech synthesis" />
               </ul>
               <p className="text-xs text-muted">
-                Configure with <Env>AI_PROVIDER=openai_compatible</Env>, <Env>AI_BASE_URL</Env>, <Env>AI_API_KEY</Env>, <Env>AI_MODEL</Env>. Works with OpenAI, Gemini and DashScope compatible endpoints. Audio needs <Env>AI_ENABLE_AUDIO=true</Env>. Without a key the mock provider produces placeholder output.
+                Configure with <Env>AI_PROVIDER=openai_compatible</Env>, <Env>AI_BASE_URL</Env>, <Env>AI_API_KEY</Env>, <Env>AI_MODEL</Env>. Works with OpenAI, Gemini and DashScope compatible endpoints. Without a key the mock provider produces placeholder output.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Mic className="size-4" /> Speech</CardTitle>
+              <CardDescription>Reads questions aloud and transcribes spoken answers in the interview room.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted">Engine</span>
+                <span className="font-medium">{s.speech.configured ? s.speech.provider : 'Browser only'}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted">Status</span>
+                <Badge variant={s.speech.configured ? 'success' : 'warning'}>{s.speech.configured ? 'Server-side' : 'Not configured'}</Badge>
+              </div>
+              <ul className="divide-y border-t pt-1">
+                <OnOff on={s.features.transcription} label={`Transcription${s.speech.sttModel ? ` · ${s.speech.sttModel}` : ''}`} />
+                <OnOff on={s.features.speech} label={`Speech synthesis${s.speech.ttsModel ? ` · ${s.speech.ttsModel}${s.speech.voice ? ` (${s.speech.voice})` : ''}` : ''}`} />
+              </ul>
+              <p className="text-xs text-muted">
+                Without a server engine, voice relies on the candidate's browser: fine in Chrome and Edge on Windows/macOS, unavailable in Brave, most Chromium builds and many Linux setups. Set <Env>SPEECH_PROVIDER=openai_compatible</Env> with <Env>SPEECH_BASE_URL</Env> pointing at the bundled free engine (<Env>docker compose --profile speech up -d</Env>) or at OpenAI with <Env>SPEECH_API_KEY</Env>.
               </p>
             </CardContent>
           </Card>

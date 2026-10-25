@@ -57,6 +57,7 @@ export const AiStatusDto = z.object({
     transcription: z.boolean(),
     speech: z.boolean(),
   }),
+  speech: z.object({ provider: z.string(), configured: z.boolean(), sttModel: z.string().nullable(), ttsModel: z.string().nullable(), voice: z.string().nullable() }),
   codeRunner: z.object({ kind: z.string(), available: z.boolean(), languages: z.array(z.string()) }),
   email: z.object({ transport: z.string(), configured: z.boolean() }),
 });

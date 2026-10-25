@@ -84,11 +84,44 @@ other than OpenAI a base URL:
 | Ollama (local) | `http://localhost:11434/v1` | `llama3.1` |
 
 The provider must support JSON-mode responses (`response_format: json_object`) for the structured
-tasks and streaming for question generation. All of the above do. Server-side speech features use
-OpenAI's audio endpoints and are enabled with `AI_ENABLE_AUDIO=true`; the interview room then
-records answers and transcribes them on the server and reads questions aloud with the configured
-voice, which works in every browser. Otherwise the web app relies on the browser's own speech
-recognition and synthesis, which costs nothing and keeps audio on the candidate's device.
+tasks and streaming for question generation. All of the above do.
+
+## Speech (voice interviews)
+
+Voice is configured separately from the language model, because the best speech engine is often
+not the best LLM and because a free, self-hosted engine makes voice work in every browser without
+any paid account. The API exposes `POST /ai/speak` (text to audio) and `POST /ai/transcribe`
+(audio to text); the interview room uses them whenever `GET /ai/status` reports them available.
+
+| Setting | Purpose |
+| --- | --- |
+| `SPEECH_PROVIDER` | `none` (default) or `openai_compatible` |
+| `SPEECH_BASE_URL` | Empty for OpenAI; the engine's `/v1` URL otherwise |
+| `SPEECH_API_KEY` | Required by OpenAI; ignored by most self-hosted engines |
+| `SPEECH_STT_MODEL` | Transcription model (`gpt-4o-mini-transcribe`, `Systran/faster-whisper-small`, …) |
+| `SPEECH_TTS_MODEL`, `SPEECH_TTS_VOICE`, `SPEECH_TTS_FORMAT` | Synthesis model, voice and container (`mp3` default) |
+
+**Self-hosted, free.** The compose file includes a [Speaches](https://speaches.ai) service
+(faster-whisper for transcription, Kokoro for synthesis) behind the OpenAI audio API. Start it
+with `docker compose --profile speech up -d`, install the models once with
+`./scripts/speech-models.sh`, point `SPEECH_BASE_URL` at `http://speaches:8000/v1`, and use
+`Systran/faster-whisper-small` with `speaches-ai/Kokoro-82M-v1.0-ONNX` / voice `af_heart`.
+It runs on CPU; a small whisper model transcribes a 30-second answer in a few seconds on a modern
+laptop, and Kokoro produces natural English speech in well under real time. The models (about 1 GB)
+live in a named volume, so they are downloaded once.
+
+**OpenAI.** Set `SPEECH_PROVIDER=openai_compatible` and `SPEECH_API_KEY`; the defaults use
+`gpt-4o-mini-transcribe` and `gpt-4o-mini-tts`.
+
+**Browser only.** With no speech provider the room falls back to the browser's own engines. This
+works well in Chrome and Edge on Windows and macOS. It does not work in Brave or in most Chromium
+builds (their speech recognition needs Google's service and reports a `network` error), and Linux
+browsers frequently have no synthesis voices installed. The room detects both situations, explains
+them to the candidate, and degrades to reading aloud only or to typing rather than failing
+silently. If your candidates are not all on Chrome, run the speech engine.
+
+What is sent where: with a speech provider, answer audio leaves the candidate's browser only to
+your API and from there to the engine you configured; the transcript, not the audio, is stored.
 
 ### The offline provider
 

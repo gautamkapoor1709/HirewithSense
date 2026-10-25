@@ -88,7 +88,33 @@ This pulls `node:24-alpine`, `python:3.12-alpine`, `gcc:14`, `eclipse-temurin:21
 simply show as unavailable in the editor's language menu. The first three cover JavaScript,
 TypeScript, Python, C and C++ and are enough for most demos.
 
-## 7. Run
+## 7. (optional) Speech engine for voice interviews
+
+The interview room reads questions aloud and transcribes spoken answers. Chrome and Edge on
+Windows and macOS can do both on their own. Brave, most Chromium builds and many Linux browsers
+cannot, so for a reliable voice experience run the free speech engine:
+
+```bash
+docker run -d --name hws-speaches -p 8000:8000 -e ENABLE_UI=false \
+  -v hf-hub-cache:/home/ubuntu/.cache/huggingface/hub ghcr.io/speaches-ai/speaches:latest-cpu
+./scripts/speech-models.sh    # downloads the two models into the engine (about 1 GB, once)
+```
+
+Then in `apps/api/.env`:
+
+```ini
+SPEECH_PROVIDER=openai_compatible
+SPEECH_BASE_URL=http://localhost:8000/v1
+SPEECH_STT_MODEL=Systran/faster-whisper-small
+SPEECH_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
+SPEECH_TTS_VOICE=af_heart
+```
+
+`curl localhost:8000/health` returns `OK` once the engine is up; the models script reports what is
+installed. Restart the API after changing `.env`. The Integrations page in the recruiter workspace
+shows whether speech is active.
+
+## 8. Run
 
 ```bash
 pnpm dev
@@ -104,7 +130,7 @@ recruiter and a candidate; the README lists the accounts. For the voice intervie
 Edge, which have built-in speech recognition, or enable server-side audio. To try the invitation flow end to end, invite any email address from the job's
 **Candidates** tab, then open **Dev mailbox** in the sidebar and click the link in the stored email.
 
-## 8. Run the tests
+## 9. Run the tests
 
 Tests use a separate database so they can truncate tables freely:
 
@@ -132,6 +158,11 @@ to check, and restart the API after pulling because the runner caches its availa
 
 **Emails never arrive.** They are not supposed to in development. Open the Dev mailbox page. If you
 want real delivery, set `EMAIL_TRANSPORT=smtp` and the `SMTP_*` variables.
+
+**Voice does not work: the question is not read aloud or the microphone stops immediately.** Your
+browser has no speech voices or no usable speech recognition (Brave and Chromium report a
+`network` error because Google's service is unavailable to them). The room tells you which. Run
+the speech engine from step 7, or use Chrome on Windows/macOS.
 
 **The interviewer asks oddly generic questions.** That is the offline provider. Set
 `AI_PROVIDER=openai_compatible` and an `AI_API_KEY` to use a real model (see

@@ -10,7 +10,6 @@ export class MockAiProvider implements AiProvider {
   readonly name = 'mock';
   readonly model = null;
   readonly configured = false;
-  readonly audio = false;
 
   async completeJson<T>(opts: JsonCompletionOptions<T>): Promise<T> {
     const input = safeJson(opts.user);
@@ -41,14 +40,6 @@ export class MockAiProvider implements AiProvider {
     for (const word of text.split(/(?<=\s)/)) {
       yield word;
     }
-  }
-
-  async transcribe(): Promise<string> {
-    throw new Error('Transcription requires a configured AI provider');
-  }
-
-  async speak(): Promise<{ audio: Buffer; mime: string }> {
-    throw new Error('Speech synthesis requires a configured AI provider');
   }
 }
 
